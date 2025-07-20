@@ -16,8 +16,7 @@ type Factory[T any] struct {
 // TypeFn is a function that returns the name of the field, the function to get the value, and the database query wrapper
 // fname is the name of the field of struct
 // fvalue is the function to get the value
-// dbWrapper is the database query wrapper. e.g. `"` will wrap the value in quotes.
-type TypeFn func() (fname string, fvalue func() any, dbWrapper rune)
+type TypeFn func() (fname string, fvalue func() any)
 
 // DefaultTypes is a map of default types constructors
 // DefaultTypesConstructors is a map of default types constructors
@@ -44,7 +43,7 @@ var DefaultTypes = map[string]func() any{
 }
 
 // New creates a new factory for the given object and custom types
-func New[T any](object T, customTypes ...func() (fn string, fv func() any)) *Factory[T] {
+func New[T any](object T, customTypes ...TypeFn) *Factory[T] {
 	f := &Factory[T]{
 		object: object,
 	}
@@ -72,17 +71,17 @@ func (f *Factory[T]) Build(overrideFunks ...func() (fn string, fv func() any)) (
 	}
 
 	v := reflect.New(t).Elem()
-	for i := 0; i < t.NumField(); i++ {
+	for i := range t.NumField() {
 		fieldValue := v.Field(i)
 
 		if !fieldValue.CanSet() {
 			continue
 		}
 
-		fieldType := fieldValue.Kind().String()
+		fieldType := fieldValue.Type().String()
 		filedValuerFn, isFieldFound := DefaultTypes[fieldType]
 		if !isFieldFound {
-			return result, fmt.Errorf("unknown type %s for field %s", fieldType, fieldType)
+			return result, fmt.Errorf("unsupported type %s for field %s", fieldType, t.Field(i).Name)
 		}
 
 		fieldValue.Set(reflect.ValueOf(filedValuerFn()))
